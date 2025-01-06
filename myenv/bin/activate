@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/phoelandsiu/fuck_anthem/myenv"
+VIRTUAL_ENV="/Users/phoelandsiu/anthem_scripting/myenv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

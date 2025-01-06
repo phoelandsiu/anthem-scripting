@@ -36,7 +36,10 @@ def fill_input_field(driver, locator_type, locator_value, text):
 
 def click_element(driver, locator_type, locator_value):
     """Reusable function to locate and click an element."""
-    button = driver.find_element(locator_type, locator_value)
+    button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((locator_type, locator_value))
+    )
+    # button = driver.find_element(locator_type, locator_value)
     button.click()
 
 def simulate_human_typing(input_element, text, delay=0.1):
@@ -123,70 +126,39 @@ def load_cookies(driver, filepath):
             driver.add_cookie(cookie)
         print("Cookies loaded!")
 
-def check_form_submission():
+def check_form_submission(driver):
     """Function to automate form submission and error detection."""
 
     try: 
-        
-        # initiate Chrome driver
-        driver = webdriver.Chrome()
-
-        # open and decode pickled cookies file
-        with open("cookies.pkl", "rb") as file:
-            cookies = pickle.load(file)
-            for cookie in cookies:
-                driver.add_cookie(cookie)
-
         # refresh page to apply cookies
         driver.refresh()
-
         print("Logged in using saved cookies!")
 
+        # click messages button
+        click_element(driver, By.CSS_SELECTOR, 'a#anthem-messages-top-menu')
+        print("Clicked Messages button!")
 
-        # username = os.getenv("USERNAME")
-        # password = os.getenv("PASSWORD")
+        # click compose message
+        click_element(driver, By.ID, "btnComposeMessage")
+        print("Clicked Compose Message button!")
 
-        # open login page
-        # driver.get("https://www.anthem.com/ca/login/")
+        # interact with dropdown and button fields
+        click_element(driver, By.ID, "ddlNewMsgCat_legend")
+        click_element(driver, By.XPATH, "//span[@data-text='Grievances / Appeals']")
 
-        # complete manual login
-        # time.sleep(20)
+        click_element(driver, By.ID, "ddlNewMsgCatSub_legend")
+        click_element(driver, By.ID, "rbtnAppealType-appealGreivancePreview-1")
+        click_element(driver, By.ID, "rbtnContactPref-appealGreivancePreview-0")
 
-        # # send login credentials
-        # fill_input_field(driver, By.ID, "txtUsername", username)
-        # fill_input_field(driver, By.ID, "txtPassword", password)
+        # fill out email and appeal details
+        fill_input_field(driver, By.ID, "txtEmail-appealGreivancePreview", "example@example.com")
+        click_element(driver, By.ID, "rbtnPatient-appealGreivancePreview-0")
+        fill_input_field(driver, By.ID, "txtAddDetail-appealGreivancePreview", 
+                         "This is additional information about my grievance or appeal.")
 
-        # # click login button
-        # click_element(driver, By.ID, "btnLogin")
-
-        # # wait for webpage to change
-        # WebDriverWait(driver, 10).until(
-        #     EC.url_changes("https://www.anthem.com/ca/login/")
-        # )
-
-        # # click messages button
-        # click_element(driver, By.ID, "tcp-nav-messages-hdr-responsive")
-
-        # # click compose message
-        # click_element(driver, By.ID, "btnComposeMessage")
-
-        # # interact with dropdown and button fields
-        # click_element(driver, By.ID, "ddlNewMsgCat_legend")
-        # click_element(driver, By.XPATH, "//span[@data-text='Grievances / Appeals']")
-
-        # click_element(driver, By.ID, "ddlNewMsgCatSub_legend")
-        # click_element(driver, By.ID, "rbtnAppealType-appealGreivancePreview-1")
-        # click_element(driver, By.ID, "rbtnContactPref-appealGreivancePreview-0")
-
-        # # fill out email and appeal details
-        # fill_input_field(driver, By.ID, "txtEmail-appealGreivancePreview", "example@example.com")
-        # click_element(driver, By.ID, "rbtnPatient-appealGreivancePreview-0")
-        # fill_input_field(driver, By.ID, "txtAddDetail-appealGreivancePreview", 
-        #                  "This is additional information about my grievance or appeal.")
-
-        # # submit the form
-        # click_element(driver, By.ID, "submit")
-        # time.sleep(2)
+        # submit the form
+        click_element(driver, By.ID, "submit")
+        time.sleep(2)
 
         # try to find an error message upon submission
         try:
@@ -218,15 +190,11 @@ def main():
     save_cookies(driver, "cookies.pkl")
 
     # Load cookies from file and add to driver
-    load_cookies(driver, "cookies.pkl")
-    with open("cookies.pkl", "rb") as file:
-        cookies = pickle.load(file)
-        for cookie in cookies:
-            print(cookie)
-        
+    load_cookies(driver, "cookies.pkl") 
     driver.refresh()
 
     print("Cookies loaded. Browser will remain open.")
+    check_form_submission(driver)
     input("Press Enter to quit...")
 
 if __name__ == "__main__":
