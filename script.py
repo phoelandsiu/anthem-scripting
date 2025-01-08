@@ -2,7 +2,7 @@ import requests
 import time
 import pickle
 
-from selenium import webdriver
+from seleniumwire import webdriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
@@ -36,10 +36,10 @@ def fill_input_field(driver, locator_type, locator_value, text):
 
 def click_element(driver, locator_type, locator_value):
     """Reusable function to locate and click an element."""
-    button = WebDriverWait(driver, 10).until(
-        EC.element_to_be_clickable((locator_type, locator_value))
-    )
-    # button = driver.find_element(locator_type, locator_value)
+    # button = WebDriverWait(driver, 10).until(
+    #     EC.element_to_be_clickable((locator_type, locator_value))
+    # )
+    button = driver.find_element(locator_type, locator_value)
     button.click()
 
 def simulate_human_typing(input_element, text, delay=0.1):
@@ -126,6 +126,23 @@ def load_cookies(driver, filepath):
             driver.add_cookie(cookie)
         print("Cookies loaded!")
 
+def locate_and_click(driver, element_id, timeout=10):
+    try:
+        # Locate the element
+        element = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.ID, element_id))
+        )
+        print(f"Element with ID '{element_id}' located!")
+
+        # Optional: Wait for stabilization (if necessary)
+        time.sleep(2)
+
+        # Click the element using JavaScript
+        driver.execute_script("arguments[0].click();", element)
+        print(f"Clicked the element with ID '{element_id}' using JavaScript!")
+    except Exception as e:
+        print(f"Failed to click the element with ID '{element_id}': {e}")
+
 def check_form_submission(driver):
     """Function to automate form submission and error detection."""
 
@@ -134,40 +151,36 @@ def check_form_submission(driver):
         driver.refresh()
         print("Logged in using saved cookies!")
 
-        # click messages button
-        click_element(driver, By.CSS_SELECTOR, 'a#anthem-messages-top-menu')
-        print("Clicked Messages button!")
-
-        # click compose message
-        click_element(driver, By.ID, "btnComposeMessage")
-        print("Clicked Compose Message button!")
-
-        # interact with dropdown and button fields
-        click_element(driver, By.ID, "ddlNewMsgCat_legend")
-        click_element(driver, By.XPATH, "//span[@data-text='Grievances / Appeals']")
-
-        click_element(driver, By.ID, "ddlNewMsgCatSub_legend")
-        click_element(driver, By.ID, "rbtnAppealType-appealGreivancePreview-1")
-        click_element(driver, By.ID, "rbtnContactPref-appealGreivancePreview-0")
-
-        # fill out email and appeal details
-        fill_input_field(driver, By.ID, "txtEmail-appealGreivancePreview", "example@example.com")
-        click_element(driver, By.ID, "rbtnPatient-appealGreivancePreview-0")
-        fill_input_field(driver, By.ID, "txtAddDetail-appealGreivancePreview", 
+        # Navigate through page to submit appeals form
+        locate_and_click(driver, "tcp-nav-messages-hdr-responsive")
+        locate_and_click(driver, "btnComposeMessage")
+        locate_and_click(driver, "ddlNewMsgCat_button")
+        locate_and_click(driver, "ddlNewMsgCat_option-14")
+        locate_and_click(driver, "ddlNewMsgCatSub_button")
+        locate_and_click(driver, "ddlNewMsgCatSub_option-0")
+        locate_and_click(driver, "rbtnAppealType-appealGreivance-1")
+        fill_input_field(driver, By.ID, "txtEmail-appealGreivance", "example@example.com")
+        fill_input_field(driver, By.ID, "txtAddDetail-appealGreivance", 
                          "This is additional information about my grievance or appeal.")
+        
+        # Intercept requests when clicking the submit button
+        driver.requests.clear()  # Clear previous requests
+        driver.find_element(By.ID, "mcv2-griev-appeal-submit").click()
+        driver.find_element(By.ID, "btnSubmitMsg").click()
 
-        # submit the form
-        click_element(driver, By.ID, "submit")
-        time.sleep(2)
+        # Wait for the request to be sent
+        WebDriverWait(driver, 10).until(lambda d: len(d.requests) > 0)
+        
+        # Check the intercepted request
+        for request in driver.requests:
+            if "submit" in request.url:  # Adjust this check based on the actual request URL
+                print(f"Request sent to: {request.url}")
+                print(f"Request method: {request.method}")
+                print(f"Request body: {request.body.decode('utf-8')}")
+                return True
 
-        # try to find an error message upon submission
-        try:
-            error_message = driver.find_element(By.CLASS_NAME, "error-message").text
-            print(f"Error detected: {error_message}")
-            return False
-        except NoSuchElementException:
-            print("Form submitted successfully!")
-            return True
+        print("No submission request detected.")
+        return False
 
     except TimeoutException as e:
         print(f"Timeout occurred: {e}")

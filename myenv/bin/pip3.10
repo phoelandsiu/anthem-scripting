@@ -1,4 +1,4 @@
-#!/Users/phoelandsiu/fuck_anthem/myenv/bin/python
+#!/Users/phoelandsiu/anthem_scripting/myenv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
