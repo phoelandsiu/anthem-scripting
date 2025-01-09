@@ -1,8 +1,10 @@
+import json
+import threading
 import requests
 import time
 import pickle
 
-from seleniumwire import webdriver
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
@@ -127,6 +129,10 @@ def load_cookies(driver, filepath):
         print("Cookies loaded!")
 
 def locate_and_click(driver, element_id, timeout=10):
+    """Locates and clicks the button specified."""
+    if is_error_present(driver):
+        print("Error detected before attempting to click.")
+        return False
     try:
         # Locate the element
         element = WebDriverWait(driver, timeout).until(
@@ -143,17 +149,54 @@ def locate_and_click(driver, element_id, timeout=10):
     except Exception as e:
         print(f"Failed to click the element with ID '{element_id}': {e}")
 
+def is_error_present(driver, timeout=20):
+    """Wait for the error message to appear and check if it is displayed."""
+    try:
+        # Wait until the error container is present and visible
+        error_element = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "ant-error-container"))
+        )
+        # Optional: Check the text content if needed
+        if "Sorry, looks like something isn't working." in error_element.text:
+            return True
+    except:
+        return False
+    
 def check_form_submission(driver):
-    """Function to automate form submission and error detection."""
+    """Function to automate form submission and intercept the form request using CDP."""
+
+    intercepted_requests = []  # To store intercepted requests
+
+    # Enable Fetch domain and set request interception patterns
+    driver.execute_cdp_cmd("Fetch.enable", {"patterns": [{"urlPattern": "*new-message*", "requestStage": "Request"}]})
+
+    def handle_request():
+        while True:
+            try:
+                events = driver.execute_cdp_cmd("Fetch.takePausedRequest", {})
+                if events and "new-message" in events["request"]["url"]:
+                    print(f"Intercepted request to: {events['request']['url']}")
+                    intercepted_requests.append(events)
+                    driver.execute_cdp_cmd("Fetch.failRequest", {"requestId": events["requestId"], "errorReason": "BlockedByClient"})
+                    break
+            except Exception:
+                pass  # Ignore if no requests are paused
+
+    threading.Thread(target=handle_request, daemon=True).start()
+
 
     try: 
-        # refresh page to apply cookies
+        # Refresh page to apply cookies
         driver.refresh()
         print("Logged in using saved cookies!")
 
         # Navigate through page to submit appeals form
-        locate_and_click(driver, "tcp-nav-messages-hdr-responsive")
-        locate_and_click(driver, "btnComposeMessage")
+        if not locate_and_click(driver, "tcp-nav-messages-hdr-responsive"):
+            print("Failed during navigation. Exiting.")
+            return False
+        if not locate_and_click(driver, "btnComposeMessage"):
+            print("Failed during navigation. Exiting.")
+            return False
         locate_and_click(driver, "ddlNewMsgCat_button")
         locate_and_click(driver, "ddlNewMsgCat_option-14")
         locate_and_click(driver, "ddlNewMsgCatSub_button")
@@ -163,36 +206,24 @@ def check_form_submission(driver):
         fill_input_field(driver, By.ID, "txtAddDetail-appealGreivance", 
                          "This is additional information about my grievance or appeal.")
         
-        # Intercept requests when clicking the submit button
-        driver.requests.clear()  # Clear previous requests
-        driver.find_element(By.ID, "mcv2-griev-appeal-submit").click()
-        driver.find_element(By.ID, "btnSubmitMsg").click()
+        # Click the submit button
+        locate_and_click(driver, "mcv2-griev-appeal-submit")
+        locate_and_click(driver, "btnSubmitMsg")
 
-        # Wait for the request to be sent
-        WebDriverWait(driver, 10).until(lambda d: len(d.requests) > 0)
+        if intercepted_requests:
+            print("Form submission was intercepted successfully.")
+            return True
         
-        # Check the intercepted request
-        for request in driver.requests:
-            if "submit" in request.url:  # Adjust this check based on the actual request URL
-                print(f"Request sent to: {request.url}")
-                print(f"Request method: {request.method}")
-                print(f"Request body: {request.body.decode('utf-8')}")
-                return True
-
-        print("No submission request detected.")
+        print("No form submission request detected.")
         return False
 
     except TimeoutException as e:
         print(f"Timeout occurred: {e}")
         return False
-    
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return False
-    
-    finally:
-        driver.quit()
 
+    finally:
+        driver.execute_cdp_cmd("Fetch.disable", {})
+        driver.quit()
 
 def main():
 
