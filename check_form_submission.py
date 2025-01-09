@@ -19,18 +19,6 @@ import undetected_chromedriver as uc
 # load environment variables from .env file
 load_dotenv()
 
-def check_website_status(url):
-    """Retrieves the status of a website given the url."""
-    try:
-        response = requests.get(url, timeout=60)
-        if response.status_code == 200:
-            print(f"{url} is up")
-        else:
-            print(f"{url} returned status code {response.status_code}.")
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {url} seems to be down. Details: {e}")
-
 def fill_input_field(driver, locator_type, locator_value, text):
     """Reusable function to locate an input field and send text."""
     input_field = driver.find_element(locator_type, locator_value)
